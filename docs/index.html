@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>pdfly</title>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --card: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --red: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.4rem; margin: 8px 0 4px; }
+  h1 .sub { color: var(--muted); font-weight: normal; font-size: 0.95rem; display: block; }
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-top: 14px;
+  }
+  button {
+    font: inherit;
+    color: var(--text);
+    background: #21262d;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 8px;
+    font-size: 1rem;
+  }
+  button:active { background: #2d333b; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.primary { background: #1f6feb; border-color: #1f6feb; }
+  button.green { background: var(--green); border-color: var(--green); color: #0d1117; font-weight: 600; }
+  .tabs { display: flex; gap: 8px; margin-top: 14px; }
+  .tabs button { margin-top: 0; padding: 10px 6px; }
+  .tabs button.active { border-color: var(--accent); color: var(--accent); }
+  .file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-top: 8px;
+    background: #0d1117;
+  }
+  .file-item .name { font-weight: 600; word-break: break-all; }
+  .file-item .size { color: var(--muted); font-size: 0.85rem; }
+  .file-item .ops { display: flex; gap: 4px; flex-shrink: 0; margin-left: 8px; }
+  .file-item button { width: auto; margin: 0; padding: 8px 12px; font-size: 0.9rem; }
+  input[type="text"] {
+    width: 100%;
+    font: inherit;
+    background: #0d1117;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    margin-top: 8px;
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-row .k { color: var(--muted); flex-shrink: 0; }
+  .info-row .v { text-align: right; word-break: break-word; }
+  .error { color: var(--red); font-size: 0.9rem; margin-top: 6px; }
+  .ok { color: var(--green); font-size: 0.9rem; margin-top: 6px; }
+  .hidden { display: none; }
+  a { color: var(--accent); }
+  .muted { color: var(--muted); font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>pdfly <span class="sub">merge, split, extract and inspect PDFs - right in your browser</span></h1>
+
+  <div class="tabs">
+    <button id="tabMerge" class="active">Merge</button>
+    <button id="tabSplit">Split</button>
+    <button id="tabExtract">Extract</button>
+    <button id="tabInfo">Info</button>
+  </div>
+
+  <!-- MERGE -->
+  <div class="panel" id="paneMerge">
+    <div class="muted">Pick two or more PDFs. They are merged in the order shown - use the arrows to reorder.</div>
+    <input type="file" id="mergeInput" accept="application/pdf,.pdf" multiple class="hidden">
+    <button id="mergePick">Choose PDF files</button>
+    <div id="mergeList"></div>
+    <button id="mergeGo" class="primary">Merge and download</button>
+    <div class="error" id="mergeError"></div>
+    <div class="ok" id="mergeOk"></div>
+  </div>
+
+  <!-- SPLIT -->
+  <div class="panel hidden" id="paneSplit">
+    <div class="muted">Pick one PDF and enter page ranges like <b>1-3,4-6</b> or single pages like <b>1,2,3</b>. You get one new PDF per range.</div>
+    <input type="file" id="splitInput" accept="application/pdf,.pdf" class="hidden">
+    <button id="splitPick">Choose a PDF</button>
+    <div class="muted" id="splitChosen" style="margin-top:8px"></div>
+    <input type="text" id="splitRanges" placeholder="Page ranges, e.g. 1-3,4-6">
+    <button id="splitGo" class="primary">Split and download parts</button>
+    <div class="muted" style="margin-top:6px">Your browser may ask to allow multiple downloads - please allow it to get every part.</div>
+    <div class="error" id="splitError"></div>
+    <div class="ok" id="splitOk"></div>
+  </div>
+
+  <!-- EXTRACT -->
+  <div class="panel hidden" id="paneExtract">
+    <div class="muted">Pick one PDF and enter the pages to keep, like <b>2,4-6</b>. Pages come out in the order you list them.</div>
+    <input type="file" id="extractInput" accept="application/pdf,.pdf" class="hidden">
+    <button id="extractPick">Choose a PDF</button>
+    <div class="muted" id="extractChosen" style="margin-top:8px"></div>
+    <input type="text" id="extractPages" placeholder="Pages, e.g. 2,4-6">
+    <button id="extractGo" class="primary">Extract and download</button>
+    <div class="error" id="extractError"></div>
+    <div class="ok" id="extractOk"></div>
+  </div>
+
+  <!-- INFO -->
+  <div class="panel hidden" id="paneInfo">
+    <div class="muted">Pick a PDF to see its page count, size and metadata.</div>
+    <input type="file" id="infoInput" accept="application/pdf,.pdf" class="hidden">
+    <button id="infoPick">Choose a PDF</button>
+    <div id="infoResult" style="margin-top:10px"></div>
+    <div class="error" id="infoError"></div>
+  </div>
+
+  <p class="muted">Everything runs on your device - your PDFs never leave your phone.
+  CLI version and source: <a href="https://github.com/Zezo998/pdfly">github.com/Zezo998/pdfly</a></p>
+</div>
+
+<script>
+"use strict";
+
+// ==PDFLY-CORE-START==
+// Core PDF logic. These functions take ArrayBuffers/Uint8Arrays and a global
+// PDFLib (from the pdf-lib CDN script) and return output bytes or info.
+
+// Parse a ranges spec like "1-3,4-6" or "2" into [{start, end}, ...] with
+// 1-based inclusive bounds. Throws an Error with a clear message on bad input.
+function parseRanges(spec, pageCount) {
+  if (!spec || !spec.trim()) throw new Error("Enter at least one page or range.");
+  const out = [];
+  for (const part of spec.split(",")) {
+    const p = part.trim();
+    if (!p) throw new Error("Empty entry in the page list.");
+    const m = p.match(/^(\d+)\s*-\s*(\d+)$/);
+    if (m) {
+      const start = Number(m[1]), end = Number(m[2]);
+      if (start > end) throw new Error('Range "' + p + '" goes backwards.');
+      if (start < 1 || end > pageCount) {
+        throw new Error('Range "' + p + '" is outside this document (1-' + pageCount + ').');
+      }
+      out.push({ start: start, end: end });
+    } else if (/^\d+$/.test(p)) {
+      const n = Number(p);
+      if (n < 1 || n > pageCount) {
+        throw new Error("Page " + n + " is outside this document (1-" + pageCount + ").");
+      }
+      out.push({ start: n, end: n });
+    } else {
+      throw new Error('Cannot understand "' + p + '". Use pages like 2 or ranges like 1-3.');
+    }
+  }
+  return out;
+}
+
+// Parse a page spec like "2,4-6" into an ordered list of 1-based page numbers.
+// Duplicates and custom order are kept, matching the CLI's extract command.
+function parsePageList(spec, pageCount) {
+  const ranges = parseRanges(spec, pageCount);
+  const pages = [];
+  for (const r of ranges) {
+    for (let n = r.start; n <= r.end; n++) pages.push(n);
+  }
+  return pages;
+}
+
+// Merge several PDF buffers into one PDF, in the given order. Returns bytes.
+async function coreMerge(buffers) {
+  const out = await PDFLib.PDFDocument.create();
+  for (const buf of buffers) {
+    const src = await PDFLib.PDFDocument.load(buf);
+    const pages = await out.copyPages(src, src.getPageIndices());
+    for (const p of pages) out.addPage(p);
+  }
+  return out.save();
+}
+
+// Split one PDF buffer by a ranges spec. Returns [{name, bytes}, ...].
+async function coreSplit(buffer, spec, baseName) {
+  const src = await PDFLib.PDFDocument.load(buffer);
+  const ranges = parseRanges(spec, src.getPageCount());
+  const parts = [];
+  for (const r of ranges) {
+    const doc = await PDFLib.PDFDocument.create();
+    const indices = [];
+    for (let n = r.start; n <= r.end; n++) indices.push(n - 1);
+    const pages = await doc.copyPages(src, indices);
+    for (const p of pages) doc.addPage(p);
+    const label = r.start === r.end ? "page-" + r.start : "pages-" + r.start + "-" + r.end;
+    parts.push({ name: baseName + "-" + label + ".pdf", bytes: await doc.save() });
+  }
+  return parts;
+}
+
+// Extract an ordered list of pages into one new PDF. Returns bytes.
+async function coreExtract(buffer, spec) {
+  const src = await PDFLib.PDFDocument.load(buffer);
+  const wanted = parsePageList(spec, src.getPageCount());
+  const doc = await PDFLib.PDFDocument.create();
+  const pages = await doc.copyPages(src, wanted.map(n => n - 1));
+  for (const p of pages) doc.addPage(p);
+  return doc.save();
+}
+
+// Read page count and metadata from one PDF buffer.
+async function coreInfo(buffer) {
+  const doc = await PDFLib.PDFDocument.load(buffer);
+  const first = doc.getPage(0);
+  const size = first ? first.getSize() : null;
+  return {
+    pageCount: doc.getPageCount(),
+    title: doc.getTitle() || null,
+    author: doc.getAuthor() || null,
+    subject: doc.getSubject() || null,
+    creator: doc.getCreator() || null,
+    producer: doc.getProducer() || null,
+    created: doc.getCreationDate() || null,
+    modified: doc.getModificationDate() || null,
+    pageSize: size ? Math.round(size.width) + " x " + Math.round(size.height) + " pt" : null
+  };
+}
+// ==PDFLY-CORE-END==
+
+// ----- UI helpers -----
+function el(id) { return document.getElementById(id); }
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+}
+
+function baseName(fileName) {
+  return fileName.replace(/\.pdf$/i, "") || "document";
+}
+
+function downloadBytes(bytes, filename) {
+  const blob = new Blob([bytes], { type: "application/pdf" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+
+function setBusy(button, busy, busyText) {
+  if (busy) {
+    button.dataset.label = button.textContent;
+    button.textContent = busyText;
+    button.disabled = true;
+  } else {
+    button.textContent = button.dataset.label || button.textContent;
+    button.disabled = false;
+  }
+}
+
+// ----- Tabs -----
+const panes = { Merge: "paneMerge", Split: "paneSplit", Extract: "paneExtract", Info: "paneInfo" };
+const tabs = { Merge: "tabMerge", Split: "tabSplit", Extract: "tabExtract", Info: "tabInfo" };
+function switchTool(which) {
+  for (const k in panes) {
+    el(panes[k]).classList.toggle("hidden", k !== which);
+    el(tabs[k]).classList.toggle("active", k === which);
+  }
+}
+for (const k in tabs) el(tabs[k]).onclick = () => switchTool(k);
+
+// Guard: pdf-lib must have loaded from the CDN.
+if (typeof PDFLib === "undefined") {
+  for (const k in panes) {
+    el(panes[k]).innerHTML =
+      '<div class="error">Could not load the PDF library (pdf-lib) from the CDN. Check your connection and reload the page.</div>';
+  }
+}
+
+// ----- Merge -----
+let mergeFiles = [];
+
+el("mergePick").onclick = () => el("mergeInput").click();
+el("mergeInput").onchange = (ev) => {
+  for (const f of ev.target.files) mergeFiles.push(f);
+  ev.target.value = "";
+  el("mergeError").textContent = "";
+  el("mergeOk").textContent = "";
+  renderMergeList();
+};
+
+function renderMergeList() {
+  const list = el("mergeList");
+  list.innerHTML = "";
+  mergeFiles.forEach((f, i) => {
+    const row = document.createElement("div");
+    row.className = "file-item";
+    const info = document.createElement("div");
+    const nm = document.createElement("div");
+    nm.className = "name";
+    nm.textContent = f.name;
+    const sz = document.createElement("div");
+    sz.className = "size";
+    sz.textContent = formatSize(f.size);
+    info.appendChild(nm); info.appendChild(sz);
+    const ops = document.createElement("div");
+    ops.className = "ops";
+    const up = document.createElement("button");
+    up.textContent = "↑";
+    up.title = "Move up";
+    up.onclick = () => { if (i > 0) { [mergeFiles[i-1], mergeFiles[i]] = [mergeFiles[i], mergeFiles[i-1]]; renderMergeList(); } };
+    const down = document.createElement("button");
+    down.textContent = "↓";
+    down.title = "Move down";
+    down.onclick = () => { if (i < mergeFiles.length - 1) { [mergeFiles[i+1], mergeFiles[i]] = [mergeFiles[i], mergeFiles[i+1]]; renderMergeList(); } };
+    const del = document.createElement("button");
+    del.textContent = "✕";
+    del.title = "Remove";
+    del.onclick = () => { mergeFiles.splice(i, 1); renderMergeList(); };
+    ops.appendChild(up); ops.appendChild(down); ops.appendChild(del);
+    row.appendChild(info); row.appendChild(ops);
+    list.appendChild(row);
+  });
+}
+
+el("mergeGo").onclick = async () => {
+  el("mergeError").textContent = "";
+  el("mergeOk").textContent = "";
+  if (mergeFiles.length < 2) {
+    el("mergeError").textContent = "Pick at least two PDF files to merge.";
+    return;
+  }
+  setBusy(el("mergeGo"), true, "Merging...");
+  try {
+    const buffers = [];
+    for (const f of mergeFiles) buffers.push(await f.arrayBuffer());
+    const bytes = await coreMerge(buffers);
+    downloadBytes(bytes, "merged.pdf");
+    el("mergeOk").textContent = "Done - merged.pdf (" + mergeFiles.length + " files) downloaded.";
+  } catch (e) {
+    el("mergeError").textContent = "Could not merge: " + e.message;
+  }
+  setBusy(el("mergeGo"), false);
+};
+
+// ----- Single-file pickers -----
+function wireSinglePicker(pickBtn, input, chosenDiv, onPick) {
+  el(pickBtn).onclick = () => el(input).click();
+  el(input).onchange = (ev) => {
+    const f = ev.target.files[0];
+    ev.target.value = "";
+    if (!f) return;
+    el(chosenDiv).textContent = f.name + " - " + formatSize(f.size);
+    onPick(f);
+  };
+}
+
+let splitFile = null;
+let extractFile = null;
+
+wireSinglePicker("splitPick", "splitInput", "splitChosen", (f) => {
+  splitFile = f;
+  el("splitError").textContent = "";
+  el("splitOk").textContent = "";
+});
+wireSinglePicker("extractPick", "extractInput", "extractChosen", (f) => {
+  extractFile = f;
+  el("extractError").textContent = "";
+  el("extractOk").textContent = "";
+});
+
+// ----- Split -----
+el("splitGo").onclick = async () => {
+  el("splitError").textContent = "";
+  el("splitOk").textContent = "";
+  if (!splitFile) {
+    el("splitError").textContent = "Choose a PDF first.";
+    return;
+  }
+  setBusy(el("splitGo"), true, "Splitting...");
+  try {
+    const buf = await splitFile.arrayBuffer();
+    const parts = await coreSplit(buf, el("splitRanges").value, baseName(splitFile.name));
+    for (let i = 0; i < parts.length; i++) {
+      downloadBytes(parts[i].bytes, parts[i].name);
+      if (i < parts.length - 1) await new Promise(r => setTimeout(r, 400));
+    }
+    el("splitOk").textContent = "Done - " + parts.length + " file(s) downloaded.";
+  } catch (e) {
+    el("splitError").textContent = e.message;
+  }
+  setBusy(el("splitGo"), false);
+};
+
+// ----- Extract -----
+el("extractGo").onclick = async () => {
+  el("extractError").textContent = "";
+  el("extractOk").textContent = "";
+  if (!extractFile) {
+    el("extractError").textContent = "Choose a PDF first.";
+    return;
+  }
+  setBusy(el("extractGo"), true, "Extracting...");
+  try {
+    const buf = await extractFile.arrayBuffer();
+    const bytes = await coreExtract(buf, el("extractPages").value);
+    downloadBytes(bytes, baseName(extractFile.name) + "-extract.pdf");
+    el("extractOk").textContent = "Done - extract downloaded.";
+  } catch (e) {
+    el("extractError").textContent = e.message;
+  }
+  setBusy(el("extractGo"), false);
+};
+
+// ----- Info -----
+el("infoPick").onclick = () => el("infoInput").click();
+el("infoInput").onchange = async (ev) => {
+  const f = ev.target.files[0];
+  ev.target.value = "";
+  if (!f) return;
+  el("infoError").textContent = "";
+  el("infoResult").innerHTML = "";
+  try {
+    const buf = await f.arrayBuffer();
+    const info = await coreInfo(buf);
+    const rows = [
+      ["File", f.name],
+      ["Size", formatSize(f.size)],
+      ["Pages", String(info.pageCount)],
+      ["Page size", info.pageSize],
+      ["Title", info.title],
+      ["Author", info.author],
+      ["Subject", info.subject],
+      ["Creator", info.creator],
+      ["Producer", info.producer],
+      ["Created", info.created ? info.created.toLocaleString() : null],
+      ["Modified", info.modified ? info.modified.toLocaleString() : null]
+    ];
+    const box = el("infoResult");
+    for (const [k, v] of rows) {
+      if (v === null) continue;
+      const row = document.createElement("div");
+      row.className = "info-row";
+      const kk = document.createElement("span");
+      kk.className = "k";
+      kk.textContent = k;
+      const vv = document.createElement("span");
+      vv.className = "v";
+      vv.textContent = v;
+      row.appendChild(kk); row.appendChild(vv);
+      box.appendChild(row);
+    }
+  } catch (e) {
+    el("infoError").textContent = "Could not read that file as a PDF: " + e.message;
+  }
+};
+</script>
+</body>
+</html>
