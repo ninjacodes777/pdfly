@@ -2,7 +2,7 @@
 
 A small Python command-line app for everyday PDF tasks. Merge documents, split a PDF into pages or ranges, extract the pages you need, and check document information. Everything runs locally on your computer.
 
-**Try the web version:** https://zezo998.github.io/pdfly/
+**Try the web version:** https://ninjacodes777.github.io/pdfly/
 
 ## Features
 
@@ -20,7 +20,7 @@ The `docs/` folder holds a single-page web app (plain HTML/CSS/JS, no build
 step) with the same merge, split, extract and info tools, hosted on GitHub
 Pages:
 
-https://zezo998.github.io/pdfly/
+https://ninjacodes777.github.io/pdfly/
 
 It works in a phone browser and runs entirely on your device using the
 [pdf-lib](https://pdf-lib.js.org/) library from a CDN - your PDFs are never
@@ -36,7 +36,7 @@ uploaded anywhere.
 Download this repository using GitHub's **Code > Download ZIP** button and extract it, or clone it with Git:
 
 ```bash
-git clone https://github.com/Zezo998/pdfly.git
+git clone https://github.com/ninjacodes777/pdfly.git
 cd pdfly
 python -m pip install -r requirements.txt
 ```
